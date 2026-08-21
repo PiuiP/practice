@@ -1,6 +1,6 @@
 import time
 from functools import wraps
-
+import logging
 
 def timer(func):
     @wraps(func)
@@ -13,7 +13,7 @@ def timer(func):
             return result
         except Exception as a:
             end = time.time()
-            print(f"The function {func.__name__}: {type(a).__name__}: str(a)")
+            print(f"The function {func.__name__}: {type(a).__name__}: {str(a)}")
             print(f'Execution time of {func.__name__} is {end - start} seconds')     
     return wrapper
 
@@ -37,6 +37,7 @@ def print_call(func):
     def wrapper(*args, **kwargs):
         print(f"Calling the function {func.__name__}")
         result = func(*args, **kwargs)
+        print(result)
         print(f"The function {func.__name__} is finished")
         return result
     return wrapper
@@ -45,7 +46,7 @@ def print_call(func):
 def add(a: int | float, b: int | float):
     return a + b
 
-print(add(5, 6))
+add(5, 6)
 
 ################################
 
@@ -97,9 +98,9 @@ def safe_execute(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
         except Exception as a:
-            print(f"The function {func.__name__}: {type(a).__name__}: str(a)")
+            print(f"The function {func.__name__}: {type(a).__name__}: {str(a)}")
     return wrapper
 
 @safe_execute
@@ -111,7 +112,6 @@ print(divide(1, 0))
 
 ##############################
 
-import logging
 
 logging.basicConfig(
     filename='app.log',
@@ -128,7 +128,7 @@ def logged(func):
             logging.info(f"{func.__name__} вернула {result}")
             return result
         except Exception as a:
-            logging.error(f"{func.__name__} вызвала {type(a).__name__}: str(a)")
+            logging.error(f"{func.__name__} вызвала {type(a).__name__}: {str(a)}")
             return "ХАХХВ ЛОХ"
     return wrapper
 
