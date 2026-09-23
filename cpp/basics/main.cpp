@@ -51,17 +51,18 @@ class Animal{
     }
 
     static int getTotalAnimals(){ // class method (like @classmethod in python но через static и можно вызвать без создания объектов
-        // return name; // ОШИБКА! статический метод не знает, чьё имя брать
+        // return name; // ОШИБКА! статический метод не знает, чьё имя брать, во такие приколы.
         return total_animals; //works only with static
     }
 
-    virtual ~Animal(){ //у базового класса всегда виртуальный дестроктор, иначе вызывается только дестркутор родителя, а деструктор наследника игнорируется -> уттечка памяти
+    virtual ~Animal(){ //у базового класса всегда виртуальный дестроктор, иначе вызывается только дестркутор родителя,
+        // а деструктор наследника игнорируется -> уттечка памяти
         std::cout << "Animal is destroyed..." << std::endl;
         total_animals--;
     }
 };
 
-int Animal::total_animals = 0; //NECCECERY!!!
+int Animal::total_animals = 0; //NECCECERY!!! надо память под атрибуты класса выделять
 
 class Dog : virtual public Animal { //create: constructor Animal -> constructor Dog; kill: destructor Dog -> destructor Animal;
     public:
@@ -99,13 +100,11 @@ int main() {
     //new/delete dynamic array
     int* dynamicArray = new int[5];
 
-    for (int i = 1; i <= 5; ++i){
-        dynamicArray[i] = i;
-        std::cout << i << ' ';
-        if (i == 5){
-        std::cout << std::endl;
-        }
+    for (int i = 0; i < 5; ++i){
+    dynamicArray[i] = i + 1; // Заполняем 1, 2, 3, 4, 5
+    std::cout << dynamicArray[i] << ' ';
     }
+    std::cout << std::endl;
 
     delete[] dynamicArray;
 
