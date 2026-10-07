@@ -297,5 +297,5 @@ int main(){
     //using_Report_methods();
     //test_LSP();
     //test_ISP();
-    //test_DIP();
+    test_DIP();
 }
