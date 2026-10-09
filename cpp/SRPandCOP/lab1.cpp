@@ -285,27 +285,154 @@ int testOptionalCourseSystem() {
 //ОСР: ????????????????????????????????????????
 //потенциально еще что-то может быть добавлено в назанчение или какие-то другие причины для выписки.
 
+//назанчения могут пополняться, делаем через иинетрфейс
+class IPrescrecption{
+    public:
+    virtual std::string describe() const = 0;
+    virtual bool requiresDoctor() const = 0; //nurse can't do operations
+    virtual ~IPrescrecption() = default;
+};
 
+//конкретные реализации назанчений
+class Medication : public IPrescrecption{
+    private:
+    std::string drug;
+    public:
+    Medication(std::string nameDrug) : drug(nameDrug) {}
+    std::string describe() const override {
+        return "Medication: " + drug;
+    }
+    bool requiresDoctor() const override {
+        return false;
+    }
+};
 
+class Procedure : public IPrescrecption{
+    private:
+    std::string name;
+    public:
+    Procedure(std::string nameProcedure) : name(nameProcedure) {}
+    std::string describe() const override {
+        return "Procedure: " + name;
+    }
+    bool requiresDoctor() const override {
+        return false;
+    }
+};
 
+class Operation : public IPrescrecption{
+    private:
+    std::string name;
+    public:
+    Operation(std::string nameOperation) : name(nameOperation) {}
+    std::string describe() const override {
+        return "OPeration: " + name;
+    }
+    bool requiresDoctor() const override{
+        return true;
+    }
+};
 
+class Doctor;
 
+class Patient {
+    private:
+    std::string name;
+    Doctor* attending = nullptr;
+    std::vector<std::shared_ptr<IPrescrecption>> prescriptions;
+    bool discharged = false;
+    public:
+    Patient(std::string n) : name(n) {}
 
+    void assignDoctor(Doctor* d) { attending = d; }
+    Doctor* getDoctor() const { return attending; }
 
+    void addPrescription(std::shared_ptr<IPrescrecption> p) { prescriptions.push_back(p); }
+    const std::vector<std::shared_ptr<IPrescrecption>>& getPrescriptions() const { return prescriptions; }
 
+    void discharge() { discharged = true; }
+    bool isDischarged() const { return discharged; }
+    std::string getName() const { return name; }
+};
 
+class Doctor {
+    std::string name;
+    public:
+    Doctor(std::string n) : name(n) {}
 
+    //назначать может только лечащий врач
+    bool prescribe(Patient& patient, std::shared_ptr<IPrescrecption> p) {
+        if (patient.getDoctor() != this) {
+            std::cout << "[Doctor " << name << "] not attending doctor of " << patient.getName() << std::endl;
+            return false;
+        }
+        patient.addPrescription(p);
+        std::cout << "[Doctor " << name << "] prescribed to " << patient.getName() << ": " << p->describe() << std::endl;
+        return true;
+    }
 
+    void execute(const IPrescrecption& p, const Patient& patient) {
+        std::cout << "[Doctor " << name << "] " << patient.getName() << " <- " << p.describe() << std::endl;
+    }
+};
 
+class Nurse {
+    std::string name;
+public:
+    Nurse(std::string n) : name(n) {}
 
+    void execute(const IPrescrecption& p, const Patient& patient) {
+        if (p.requiresDoctor()) {
+            std::cout << "[Nurse " << name << "] REJECTED: " << patient.getName() 
+                      << " <- " << p.describe() << " (Requires Doctor!)" << std::endl;
+            return;
+        }
+        std::cout << "[Nurse " << name << "] " << patient.getName() 
+                  << " <- " << p.describe() << std::endl;
+    }
+};
 
+class Hospital {
+    std::vector<Patient*> patients;
+public:
+    void admit(Patient& patient, Doctor& attending) {
+        patient.assignDoctor(&attending);
+        patients.push_back(&patient);
+        std::cout << "[Hospital] admitted " << patient.getName() << std::endl;
+    }
 
+    void discharge(Patient& patient, const std::string& reason) {
+        patient.discharge();
+        std::cout << "[Hospital] " << patient.getName() << " discharged: " << reason << std::endl;
+    }
+};
 
+int testHospitalSystem() {
+    Hospital hospital;
+    Doctor house("House");
+    Doctor wilson("Wilson");
+    Nurse nurse("Anna");
+    Patient patient("Ivan");
 
+    hospital.admit(patient, house);
 
+    house.prescribe(patient, std::make_shared<Medication>("Aspirin"));
+    house.prescribe(patient, std::make_shared<Operation>("Appendectomy"));
+    wilson.prescribe(patient, std::make_shared<Procedure>("Massage"));  //не лечащий -> отказ
+
+    // исполняют назначения: медсестра и другой врач
+    nurse.execute(*patient.getPrescriptions()[0], patient);
+    wilson.execute(*patient.getPrescriptions()[1], patient);
+
+    nurse.execute(*patient.getPrescriptions()[1], patient); //медсестра не может делать операции -> отказ
+
+    hospital.discharge(patient, "treatment completed");
+    return 0;
+}
 
 
 int main(){
     //testPaymentSystem();
-    testOptionalCourseSystem();
+    //testOptionalCourseSystem();
+    testHospitalSystem();
 }
