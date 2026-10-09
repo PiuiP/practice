@@ -1,5 +1,8 @@
+#include <algorithm>
 #include <iostream>
 #include <string>
+#include <vector>
+#include <map>
 //PAYMENT SYSTEM
 //Сущности: Клиент, Счет, Кредитная карта (КК), Заказ, Администратор.
 //Дей-я и инкапсуляция:
@@ -114,7 +117,7 @@ class Client{
     }
 };
 
-int Client::total_clients = 0;
+int Client::total_clients = 1; //first client - 1, not 0;
 
 class Administrator {
 public:
@@ -126,6 +129,7 @@ public:
 int testPaymentSystem() {
     Client client("NAruto");
     Administrator admin;
+    Client client2;
 
     CreditCard card(5000);
     BankAccount myAccount(10000);
@@ -144,6 +148,9 @@ int testPaymentSystem() {
     //попытка оплаты заблокированной картой -> упадет
     client.transferMoney(card, myOrder, 1000);
 
+    //проверка статического атрибута класса
+    std::cout << client2.getName();
+
     return 0;
 }
 
@@ -151,30 +158,60 @@ int testPaymentSystem() {
 //Сущности: Студент, Архив, Преподаватель, Курс, Оценка(?).
 //Дей-я и инкапсуляция:
 // - Студент: записаться на курс/курсы, получить оценку по курсу;
-// - Преподаватель: создать курс/объявить запись на курс,поставить оценку;
+// - Преподаватель: объявить запись на курс,поставить оценку;
 // - Курс: название, продолжительность, список записанных студентов.
 // - Оценка: по завершении курса сохраняется в архив;
 // - Архив: сохранить курс-оценка-студент.
 //ОСР: вероятно как-то связан с тем, как сохраняются данные о студентах, прошедших курсы, и их результаты.
 
+class Course;
+
 class Student {
 private:
     std::string name;
-    int id;
 public:
-    Student(std::string n, int i) : name(n), id(i) {}
+    Student(std::string n) : name(n) {}
+
+    bool enrollToCourse(Course& course);  // тело ниже, после Course
+
     std::string getName() const { return name; }
-    int getId() const { return id; }
 };
 
-//как-то хранит студентов
 class Course {
 private:
     std::string name;
+    int duration;
+    std::vector<Student> students;
 public:
-    Course(std::string n) : name(n) {}
+    Course(std::string n, int d) : name(n), duration(d) {}
+
+    bool hasStudent(const Student& s) const {
+        return std::any_of(students.begin(), students.end(),
+            [&](const Student& x) { return x.getName() == s.getName(); });
+    }
+
+    bool addStudent(const Student& s) {
+        if (hasStudent(s)) {
+            std::cout << s.getName() << " already in this course " << name << std::endl;
+            return false;
+        }
+        students.push_back(s);
+        return true;
+    }
+
+    std::string getINFO() const {
+        return "Course Name: " + name + " Duration: " + std::to_string(duration) +
+               " Enrolled students: " + std::to_string(students.size());
+    }
+
+    const std::vector<Student>& getListStudents() const { return students; }
+
     std::string getName() const { return name; }
 };
+
+bool Student::enrollToCourse(Course& course) {
+    return course.addStudent(*this);
+}
 
 class IGradeStorage {
 public:
@@ -182,21 +219,73 @@ public:
     virtual ~IGradeStorage() = default;
 };
 
-//вариант реализации хранения оценок студентов - архив (по заданию)
 class LocalArchive : public IGradeStorage {
 private:
+    std::map<std::string, std::map<std::string, double>> archive;
 public:
+    void saveGrade(const Student& student, const Course& course, double grade) override {
+        archive[course.getName()][student.getName()] = grade;
+    }
+
+    void getINFO() const {
+        for (const auto& course : archive) {
+            std::cout << course.first << ":\n";
+            for (const auto& student : course.second) {
+                std::cout << "  " << student.first << ": " << student.second << "\n";
+            }
+        }
+    }
 };
 
-//сюда передадим потом интерфейс хранилища, а не конркетную реализацию для принциипа открытости/закртости
+//зависит от интерфейса хранилища, а не от LocalArchive
 class Teacher {
 private:
     std::string name;
+    IGradeStorage& storage;
 public:
+    Teacher(std::string n, IGradeStorage& st) : name(n), storage(st) {}
+
+    bool setGrade(const Student& student, const Course& course, double grade) {
+        if (!course.hasStudent(student)) {
+            std::cout << student.getName() << " not enrolled on this course " << course.getName() << std::endl;
+            return false;
+        }
+        storage.saveGrade(student, course, grade);
+        return true;
+    }
 };
 
 int testOptionalCourseSystem() {
+    LocalArchive archive;
+    Teacher teacher("Ivanov", archive);
+
+    Course course("C++", 40);
+    Student alice("Alice");
+    Student bob("Bob");
+
+    alice.enrollToCourse(course);
+    alice.enrollToCourse(course);  // повторная запись -> отказ
+
+    teacher.setGrade(alice, course, 5.0);
+    teacher.setGrade(bob, course, 4.0);  // Bob не записан -> отказ
+
+    std::cout << course.getINFO() << std::endl;
+    archive.getINFO();
+    return 0;
 }
+
+//HOPITAL SYSTEM
+//Сущности: Пациент, Лечащий Врач, Назначение, Другой врач/медсестра, Больница
+//Дей-я и инкапсуляция:
+// - Больница: Пациенты, Врачи, пациенты выписываются по окончании лечения/при нарушении режима/иное;
+// - Назначение: процедуры, лекарства, операции;
+// - Пациент: имеет ЛЕЧАЩЕГО врача, может быть забанен, получает назанчение от лечащего врача, получает процедуры от ДРУГОГО врача
+// - Лечащий врач: делает назначение;
+// - Другой врач: исполняет назанчения пациента.
+//ОСР: ????????????????????????????????????????
+//потенциально еще что-то может быть добавлено в назанчение или какие-то другие причины для выписки.
+
+
 
 
 
