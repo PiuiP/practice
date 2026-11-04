@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 #include <map>
@@ -362,6 +363,10 @@ class Doctor {
 
     //назначать может только лечащий врач
     bool prescribe(Patient& patient, std::shared_ptr<IPrescrecption> p) {
+        if (patient.isDischarged()){
+            std::cout << "[Doctor " << name << "]  " << patient.getName() << " is already discharged."<<std::endl;
+            return false;
+        }
         if (patient.getDoctor() != this) {
             std::cout << "[Doctor " << name << "] not attending doctor of " << patient.getName() << std::endl;
             return false;
@@ -371,8 +376,13 @@ class Doctor {
         return true;
     }
 
-    void execute(const IPrescrecption& p, const Patient& patient) {
+    bool execute(const IPrescrecption& p, const Patient& patient) {
+        if (patient.isDischarged()){
+            std::cout << "[Doctor " << name << "]  " << patient.getName() << " is already discharged."<<std::endl;
+            return false;
+        }
         std::cout << "[Doctor " << name << "] " << patient.getName() << " <- " << p.describe() << std::endl;
+        return true;
     }
 };
 
@@ -381,33 +391,128 @@ class Nurse {
 public:
     Nurse(std::string n) : name(n) {}
 
-    void execute(const IPrescrecption& p, const Patient& patient) {
+    bool execute(const IPrescrecption& p, const Patient& patient) {
+        if (patient.isDischarged()){
+            std::cout << "[Nurse " << name << "]  " << patient.getName() << " is already discharged."<<std::endl;
+            return false;
+        }
         if (p.requiresDoctor()) {
             std::cout << "[Nurse " << name << "] REJECTED: " << patient.getName() 
                       << " <- " << p.describe() << " (Requires Doctor!)" << std::endl;
-            return;
+            return false;
         }
         std::cout << "[Nurse " << name << "] " << patient.getName() 
                   << " <- " << p.describe() << std::endl;
+        return true;
     }
 };
+
+bool isInList(const std::vector<Patient*>& list, Patient& toSearch){
+    auto iterator = std::find(list.begin(), list.end(), &toSearch);
+    if (iterator != list.end()) {
+        return true;
+    }
+    return false;
+}
 
 class Hospital {
     std::vector<Patient*> patients;
 public:
-    void admit(Patient& patient, Doctor& attending) {
+    bool admit(Patient& patient, Doctor& attending) {
+        if (isInList(patients, patient)) {
+            std::cout << "[Hospital] patient " << patient.getName() 
+                      << " is already admittied." <<std::endl;;
+            return false;
+        }
         patient.assignDoctor(&attending);
         patients.push_back(&patient);
         std::cout << "[Hospital] admitted " << patient.getName() << std::endl;
+        return true;
     }
 
-    void discharge(Patient& patient, const std::string& reason) {
+    bool discharge(Patient& patient, const std::string& reason) {
+        if (!isInList(patients, patient)) {
+            std::cout << "[Hospital] patient " << patient.getName() 
+                      << " is already discharge." <<std::endl;;
+            return false;
+        }
         patient.discharge();
+        auto it = std::find(patients.begin(), patients.end(), &patient);
+        if (it != patients.end()) {
+            patients.erase(it);
+        }
         std::cout << "[Hospital] " << patient.getName() << " discharged: " << reason << std::endl;
+        return true;
+    }
+
+    void getAllPatients(){
+        int counter = 0;
+        for (auto it = patients.begin(); it != patients.end(); ++it) {
+            Patient* p = *it; 
+            if (p != nullptr) {
+                counter++;
+                std::cout << p->getName() << std::endl;
+            }
+        }
+        if (counter == 0){
+            std::cout << "[Hospital] There are no patients." <<std::endl;
+        }
     }
 };
 
-int testHospitalSystem() {
+// ======================= Тестирование =======================
+int passed = 0, failed = 0;
+
+void check(bool condition, const std::string& name) {
+    if (condition) { passed++; std::cout << "  [OK]   " << name << std::endl; }
+    else           { failed++; std::cout << "  [FAIL] " << name << std::endl; }
+}
+
+void runTests() {
+    std::cout << "\n===== Testing =====" << std::endl;
+
+    Hospital hospital;
+    Doctor house("House");
+    Doctor wilson("Wilson");
+    Nurse nurse("Anna");
+    Patient patient("Ivan");
+
+    // приём
+    check(hospital.admit(patient, house), "Patient is admitted");
+    check(patient.getDoctor() == &house, "Attending doctor is assigned");
+    check(!hospital.admit(patient, house), "Repeated admission is rejected");
+
+    // назначения
+    check(house.prescribe(patient, std::make_shared<Medication>("Aspirin")), "Attending doctor prescribes medication");
+    check(house.prescribe(patient, std::make_shared<Operation>("Appendectomy")), "Attending doctor prescribes operation");
+    check(!wilson.prescribe(patient, std::make_shared<Procedure>("Massage")), "Non-attending doctor cannot prescribe");
+    check(patient.getPrescriptions().size() == 2, "Patient has 2 prescriptions (rejected one is not added)");
+
+    // исполнение
+    const IPrescrecption& drug = *patient.getPrescriptions()[0];
+    const IPrescrecption& op   = *patient.getPrescriptions()[1];
+    check(nurse.execute(drug, patient), "Nurse executes medication");
+    check(!nurse.execute(op, patient), "Nurse cannot execute operation");
+    check(wilson.execute(op, patient), "Another doctor executes operation");
+
+    // выписка
+    check(hospital.discharge(patient, "treatment completed"), "Patient is discharged");
+    check(patient.isDischarged(), "Patient is marked as discharged");
+    check(!hospital.discharge(patient, "again"), "Repeated discharge is rejected");
+
+    // после выписки ничего нельзя
+    check(!house.prescribe(patient, std::make_shared<Medication>("Vitamin C")), "Cannot prescribe after discharge");
+    check(!wilson.execute(op, patient), "Doctor cannot execute after discharge");
+    check(!nurse.execute(drug, patient), "Nurse cannot execute after discharge");
+
+    // выписка того, кого не принимали
+    Patient stranger("Stranger");
+    check(!hospital.discharge(stranger, "none"), "Cannot discharge a patient who was not admitted");
+
+    std::cout << "Passed: " << passed << ", failed: " << failed << std::endl;
+}
+
+int testHospitalSystemForDevelop() {
     Hospital hospital;
     Doctor house("House");
     Doctor wilson("Wilson");
@@ -427,6 +532,11 @@ int testHospitalSystem() {
     nurse.execute(*patient.getPrescriptions()[1], patient); //медсестра не может делать операции -> отказ
 
     hospital.discharge(patient, "treatment completed");
+    hospital.getAllPatients(); //првоеряем, что пациент дропнулся
+    //нельзя ничего сделать с уже выписанным пациентом
+    house.prescribe(patient, std::make_shared<Medication>("HentaVirus")); //rejection
+    wilson.execute(*patient.getPrescriptions()[1], patient);
+    nurse.execute(*patient.getPrescriptions()[0], patient);
     return 0;
 }
 
@@ -434,5 +544,7 @@ int testHospitalSystem() {
 int main(){
     //testPaymentSystem();
     //testOptionalCourseSystem();
-    testHospitalSystem();
+    testHospitalSystemForDevelop(); //for demonstartion?
+    runTests(); //for checking
+    return failed == 0 ? 0 : 1;
 }
