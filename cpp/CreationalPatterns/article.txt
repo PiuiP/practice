@@ -1,5 +1,0 @@
-Builder Pattern
-Minok A.A.
-Builder separates object construction into steps.
-Second line of the article text.
-3481294437
