@@ -16,3 +16,6 @@ venv/
 *.manifest
 *.res
 *.sbr
+
+*.txt
+*.xml

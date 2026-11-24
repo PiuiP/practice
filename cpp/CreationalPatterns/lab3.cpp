@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <random>
+#include <cstdlib>
 #include <cassert>
 
 //BUILDER: статья TXT -> XML
@@ -36,7 +36,7 @@ public:
     void buildAuthors(const std::string& a) override { doc.add("  <authors>" + a + "</authors>\n"); }
     void buildText(const std::string& t)    override { doc.add("  <text>" + t + "</text>\n"); }
     void buildHash(const std::string& h)    override { doc.add("  <hash>" + h + "</hash>\n"); }
-    XmlDocument getResult() override { doc.add("</article>\n"); return doc; }
+    XmlDocument getResult() override { XmlDocument res = doc; res.add("</article>\n"); return res; }
 };
 
 // Director — задаёт порядок этапов и проверяет статью
@@ -131,6 +131,10 @@ public:
     }
     ~RentalOrder() { delete audio; delete subtitles; }
 
+    // копировать заказ нельзя: две копии удалили бы одни и те же объекты дважды
+    RentalOrder(const RentalOrder&) = delete;
+    RentalOrder& operator=(const RentalOrder&) = delete;
+
     // смена языка: звуковая дорожка и субтитры меняются вместе
     void setLanguage(IMediaFactory& factory) {
         delete audio; delete subtitles;
@@ -169,37 +173,30 @@ public:
     virtual Piece* createPiece() = 0; // фабричный метод
 };
 class StandardPieceCreator : public PieceCreator {
-    std::mt19937 rng;
 public:
-    StandardPieceCreator() : rng(12345) {}
     Piece* createPiece() override {
-        switch (rng() % 4) {
-        case 0: return new IPiece();
-        case 1: return new OPiece();
-        case 2: return new TPiece();
-        default: return new LPiece();
-        }
+        int n = std::rand() % 4;              // случайное число 0, 1, 2 или 3
+        if (n == 0) return new IPiece();
+        if (n == 1) return new OPiece();
+        if (n == 2) return new TPiece();
+        return new LPiece();
     }
 };
 class SuperPieceCreator : public PieceCreator {
-    std::mt19937 rng;
 public:
-    SuperPieceCreator() : rng(54321) {}
     Piece* createPiece() override {
-        if (rng() % 2 == 0) return new PlusPiece();
+        if (std::rand() % 2 == 0) return new PlusPiece();
         return new BigSquarePiece();
     }
 };
 
 // Клиент паттерна фабричного метода.
 class Game {
-    std::mt19937 rng;
     StandardPieceCreator standardCreator;
     SuperPieceCreator superCreator;
 public:
-    Game() : rng(2026) {}
     Piece* nextPiece() {
-        if (rng() % 5 == 0) return superCreator.createPiece(); // ~20% супер-фигур
+        if (std::rand() % 5 == 0) return superCreator.createPiece(); // ~20% супер-фигур
         return standardCreator.createPiece();
     }
 };
@@ -267,6 +264,8 @@ void testFactoryMethod() {
 }
 
 int main(int argc, char* argv[]) {
+    std::srand(12345);   // фиксированное зерно: случайность повторяется от запуска к запуску
+
     testBuilder();
     testAbstractFactory();
     testFactoryMethod();
