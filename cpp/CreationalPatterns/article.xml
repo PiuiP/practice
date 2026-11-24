@@ -1,0 +1,7 @@
+<article>
+  <title>Builder Pattern</title>
+  <authors>Minok A.A.</authors>
+  <text>Builder separates object construction into steps.
+Second line of the article text.</text>
+  <hash>3481294437</hash>
+</article>

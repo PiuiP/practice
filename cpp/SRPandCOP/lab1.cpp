@@ -348,7 +348,7 @@ class Patient {
     void assignDoctor(Doctor* d) { attending = d; }
     Doctor* getDoctor() const { return attending; }
 
-    void addPrescription(std::shared_ptr<IPrescrecption> p) { prescriptions.push_back(p); }
+    void addPrescription(std::shared_ptr<IPrescrecption> p) { prescriptions.push_back(p); } //закрыть метод и дать к нему доступ только через Doctor (friend)?????
     const std::vector<std::shared_ptr<IPrescrecption>>& getPrescriptions() const { return prescriptions; }
 
     void discharge() { discharged = true; }
